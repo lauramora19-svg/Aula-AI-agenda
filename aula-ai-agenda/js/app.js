@@ -368,6 +368,5 @@ class AppController {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.app = new AppController();
-});
+// AppController se instancia desde authGate.js, solo después de que el
+// usuario haya iniciado sesión y se hayan cargado sus datos de Supabase.

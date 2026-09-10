@@ -163,7 +163,7 @@ class ClasesEngine {
                     <td style="padding: 8px 0; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
                     <td style="padding: 8px 0; font-weight: 600; color: var(--text-primary);">${s.name}</td>
                     <td style="padding: 8px 0;">${s.neae ? `<span class="neae-badge" style="font-size: 0.68rem;">NEAE</span>` : '—'}</td>
-                    <td style="padding: 8px 0; color: var(--text-secondary);">${s.birthday || '—'}</td>
+                    <td style="padding: 8px 0; color: var(--text-secondary);">${s.birthday ? window.alumnoEngine.formatBirthday(s.birthday) : '—'}</td>
                     <td style="padding: 8px 0;">
                       <span class="behavior-pill behavior-${(s.behavior || 'Sin registrar').toLowerCase().replace(' ', '-')}">
                         ${s.behavior || 'Sin registrar'}
@@ -187,7 +187,7 @@ class ClasesEngine {
               <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px;">
                 ${roster.filter(s => s.birthday).length === 0
                   ? '<span style="color: var(--text-muted);">Sin cumpleaños registrados.</span>'
-                  : roster.filter(s => s.birthday).slice(0, 4).map(s => `<div>🎂 <strong>${s.name.split(' ')[0]}:</strong> ${s.birthday}</div>`).join('')}
+                  : roster.filter(s => s.birthday).slice(0, 4).map(s => `<div>🎂 <strong>${s.name.split(' ')[0]}:</strong> ${window.alumnoEngine.formatBirthday(s.birthday)}</div>`).join('')}
               </div>
             </div>
 
@@ -412,7 +412,7 @@ class ClasesEngine {
     document.getElementById('full-student-name').innerText = student.name;
     document.getElementById('full-student-group').innerText = student.group ? `Grupo ${student.group}` : 'Sin grupo';
     document.getElementById('full-student-avatar-letter').innerText = student.name[0];
-    document.getElementById('full-student-birthday').innerText = student.birthday || '—';
+    document.getElementById('full-student-birthday').innerText = student.birthday ? window.alumnoEngine.formatBirthday(student.birthday) : '—';
     document.getElementById('full-student-parent').innerText = student.parentName || '—';
     document.getElementById('full-student-phone').innerText = student.parentPhone || '—';
     document.getElementById('full-student-email').innerText = student.parentEmail || '—';

@@ -112,44 +112,56 @@ const DEFAULT_STATE = {
 
 class AppStore {
   constructor() {
-    this.state = this.loadState();
+    // Arranca con el estado por defecto; los datos reales llegan tras el
+    // login, con loadFromCloud() (ver authGate.js).
+    this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    this.userId = null;
   }
 
-  loadState() {
+  // Se llama justo después de iniciar sesión, con el id del usuario, para
+  // traer sus datos guardados en Supabase (o arrancar en blanco si es la
+  // primera vez que entra).
+  async loadFromCloud(userId) {
+    this.userId = userId;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Migración desde versiones antiguas: "lessons" plano -> semana 0
-        if (parsed.lessons && !parsed.weeklyLessons) {
-          parsed.weeklyLessons = { 0: parsed.lessons };
-          delete parsed.lessons;
-        }
-        // Migración: "seating" global antiguo ya no se usa (ahora es por clase)
-        if (parsed.seating && !parsed.seatingByClass) {
-          delete parsed.seating;
-        }
-        return {
-          ...DEFAULT_STATE,
-          ...parsed,
-          weeklyLessons: parsed.weeklyLessons || DEFAULT_STATE.weeklyLessons,
-          seatingByClass: parsed.seatingByClass || DEFAULT_STATE.seatingByClass,
-          messageTemplates: parsed.messageTemplates || DEFAULT_STATE.messageTemplates,
-          slots: parsed.slots && parsed.slots.length ? parsed.slots : DEFAULT_STATE.slots,
-        };
+      const { data, error } = await window.sb
+        .from('agenda_data')
+        .select('data')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) throw error;
+
+      const parsed = (data && data.data) || {};
+      // Migración desde versiones antiguas: "lessons" plano -> semana 0
+      if (parsed.lessons && !parsed.weeklyLessons) {
+        parsed.weeklyLessons = { 0: parsed.lessons };
+        delete parsed.lessons;
       }
+      this.state = {
+        ...DEFAULT_STATE,
+        ...parsed,
+        weeklyLessons: parsed.weeklyLessons || DEFAULT_STATE.weeklyLessons,
+        seatingByClass: parsed.seatingByClass || DEFAULT_STATE.seatingByClass,
+        messageTemplates: parsed.messageTemplates || DEFAULT_STATE.messageTemplates,
+        slots: parsed.slots && parsed.slots.length ? parsed.slots : DEFAULT_STATE.slots,
+      };
     } catch (e) {
-      console.warn('Error loading from LocalStorage:', e);
+      console.error('Error cargando datos de Supabase:', e);
+      this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
     }
-    return JSON.parse(JSON.stringify(DEFAULT_STATE));
   }
 
   saveState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-    } catch (e) {
-      console.error('Error saving to LocalStorage:', e);
-    }
+    if (!this.userId || !window.sb) return;
+    window.sb
+      .from('agenda_data')
+      .upsert(
+        { user_id: this.userId, data: this.state, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+      .then(({ error }) => {
+        if (error) console.error('Error guardando en Supabase:', error);
+      });
   }
 
   // Devuelve (y crea si hace falta) el objeto de clases de una semana concreta.

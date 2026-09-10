@@ -36,8 +36,11 @@ class AlumnoEngine {
             <div class="student-info-course">${student.group ? `Grupo ${student.group}` : 'Sin grupo asignado'}</div>
           </div>
           ${student.neae ? `<span class="neae-badge"><i class="fa-solid fa-star"></i> NEAE</span>` : ''}
+          <button onclick="window.alumnoEngine.deleteStudent('${student.id}')" style="border:none;background:none;color:var(--text-muted);cursor:pointer;flex-shrink:0;" title="Eliminar alumno/a">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
         </div>
-        
+
         ${student.neae ? `
           <div style="font-size: 0.8rem; font-weight: 600; color: #dc2626; background: #fef2f2; padding: 4px 8px; border-radius: var(--radius-sm);">
             <i class="fa-solid fa-triangle-exclamation"></i> ${student.neaeType}
@@ -46,6 +49,13 @@ class AlumnoEngine {
 
         <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.4;">
           <strong>Pautas / Adaptación:</strong> ${student.notes || 'Sin observaciones específicas.'}
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 0.76rem; color: var(--text-muted);">
+          <span><i class="fa-solid fa-cake-candles"></i> ${student.birthday ? this.formatBirthday(student.birthday) : 'Sin cumpleaños'}</span>
+          <span class="behavior-pill behavior-${(student.behavior || 'Sin registrar').toLowerCase().replace(' ', '-')}" style="font-size: 0.68rem;">
+            ${student.behavior || 'Sin registrar'}
+          </span>
         </div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
@@ -58,6 +68,13 @@ class AlumnoEngine {
     `).join('');
   }
 
+  formatBirthday(dateStr) {
+    // dateStr en formato YYYY-MM-DD (del <input type="date">)
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  }
+
   openEditStudentModal(studentId) {
     // Si no hay studentId, es un alumno NUEVO: abrimos el formulario en blanco
     // (antes esto cortaba en seco y el botón "Nuevo Alumno" no hacía nada)
@@ -68,7 +85,13 @@ class AlumnoEngine {
     document.getElementById('edit-student-group').value = student ? student.group : '';
     document.getElementById('edit-student-neae').checked = student ? !!student.neae : false;
     document.getElementById('edit-student-neaetype').value = student ? (student.neaeType || '') : '';
+    document.getElementById('edit-student-birthday').value = student ? (student.birthday || '') : '';
+    document.getElementById('edit-student-behavior').value = student ? (student.behavior || '') : '';
     document.getElementById('edit-student-notes').value = student ? (student.notes || '') : '';
+
+    // El botón de eliminar solo tiene sentido si el alumno ya existe
+    const deleteBtn = document.getElementById('modal-student-delete-btn');
+    if (deleteBtn) deleteBtn.style.display = student ? 'inline-flex' : 'none';
 
     window.app.openModal('modal-student');
   }
@@ -79,6 +102,8 @@ class AlumnoEngine {
     const group = document.getElementById('edit-student-group').value;
     const neae = document.getElementById('edit-student-neae').checked;
     const neaeType = document.getElementById('edit-student-neaetype').value.trim();
+    const birthday = document.getElementById('edit-student-birthday').value;
+    const behavior = document.getElementById('edit-student-behavior').value;
     const notes = document.getElementById('edit-student-notes').value.trim();
 
     if (!name) {
@@ -90,12 +115,12 @@ class AlumnoEngine {
     if (idx !== -1) {
       window.store.state.students[idx] = {
         ...window.store.state.students[idx],
-        name, group, neae, neaeType, notes
+        name, group, neae, neaeType, birthday, behavior, notes
       };
     } else {
       window.store.state.students.push({
         id: `STU-${Date.now()}`,
-        name, group, neae, neaeType, notes, behavior: '', gradeAvg: null
+        name, group, neae, neaeType, birthday, behavior, notes, gradeAvg: null
       });
     }
 
@@ -103,6 +128,31 @@ class AlumnoEngine {
     this.renderStudentsList();
     window.app.closeModal('modal-student');
     window.app.showToast('Ficha de alumnado guardada con éxito.', 'success');
+  }
+
+  // Elimina un alumno/a directamente desde la tarjeta (con confirmación)
+  deleteStudent(studentId) {
+    const student = window.store.state.students.find(s => s.id === studentId);
+    if (!student) return;
+    if (!confirm(`¿Eliminar la ficha de ${student.name}? También se quitará de cualquier pupitre asignado.`)) return;
+
+    window.store.state.students = window.store.state.students.filter(s => s.id !== studentId);
+    // Lo quitamos también de cualquier plano de aula donde estuviera sentado
+    Object.values(window.store.state.seatingByClass || {}).forEach(record => {
+      record.seats.forEach(seat => { if (seat.studentId === studentId) seat.studentId = null; });
+    });
+
+    window.store.saveState();
+    this.renderStudentsList();
+    window.app.showToast('Alumno/a eliminado.', 'info');
+  }
+
+  // Elimina desde dentro del propio formulario de edición
+  deleteStudentFromModal() {
+    const id = document.getElementById('edit-student-id').value;
+    if (!id) return;
+    this.deleteStudent(id);
+    window.app.closeModal('modal-student');
   }
 }
 
